@@ -61,7 +61,7 @@ export class ContractsService {
         // Format data
         const data = {
             ...contract,
-            employeeName: contract.employee?.fullName.toUpperCase(),
+            employeeName: (contract.employee?.fullName || '').toUpperCase(),
             startDate: contract.startDate ? new Date(contract.startDate).toLocaleDateString('vi-VN') : '',
             // Add other mappings
         };

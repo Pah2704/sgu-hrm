@@ -14,6 +14,7 @@ export interface User {
     isActive: boolean;
     employeeId: string;
     roles?: { id: string; name: string }[];
+    employee?: { fullName: string };
 }
 
 export const getUsers = async () => {

@@ -24,7 +24,7 @@ const UsersPage: React.FC = () => {
             setUsers(usersData);
             setRoles(rolesData);
         } catch (error) {
-            message.error('Failed to fetch data');
+            message.error('Lỗi tải dữ liệu');
         } finally {
             setLoading(false);
         }
@@ -43,24 +43,24 @@ const UsersPage: React.FC = () => {
             const values = await form.validateFields();
             if (selectedUser) {
                 await assignRoles(selectedUser.id, values.roleIds);
-                message.success('Roles assigned successfully');
+                message.success('Cập nhật quyền thành công');
                 setIsModalVisible(false);
                 fetchData();
             }
         } catch (e) {
-            message.error('Failed to assign roles');
+            message.error('Lỗi phân quyền');
         }
     };
 
     const columns = [
-        { title: 'Username', dataIndex: 'username', key: 'username' },
+        { title: 'Tên đăng nhập', dataIndex: 'username', key: 'username' },
         {
-            title: 'Employee',
+            title: 'Nhân viên liên kết',
             key: 'employee',
-            render: (user: User) => (user.employeeId ? 'Linked' : 'Not Linked') // Should show Name if populated
+            render: (user: User) => (user.employee?.fullName || (user.employeeId ? 'Đã liên kết' : 'Chưa liên kết'))
         },
         {
-            title: 'Roles',
+            title: 'Vai trò',
             key: 'roles',
             render: (user: User) => (
                 <Space>
@@ -69,10 +69,10 @@ const UsersPage: React.FC = () => {
             )
         },
         {
-            title: 'Action', key: 'action',
+            title: 'Hành động', key: 'action',
             render: (_: any, record: User) => (
                 <Button icon={<EditOutlined />} onClick={() => handleAssignRoles(record)}>
-                    Assign Roles
+                    Phân quyền
                 </Button>
             )
         }

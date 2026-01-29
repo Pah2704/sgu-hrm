@@ -20,7 +20,7 @@ const EmployeeList: React.FC = () => {
             const response = await axios.get(`${apiUrl}/employees`);
             setData(response.data);
         } catch (error) {
-            message.error('Could not fetch employees');
+            message.error('Không thể tải danh sách nhân sự');
         } finally {
             setLoading(false);
         }
@@ -34,10 +34,10 @@ const EmployeeList: React.FC = () => {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         try {
             await axios.delete(`${apiUrl}/employees/${id}`);
-            message.success('Employee deleted');
+            message.success('Đã xóa nhân sự');
             fetchData();
         } catch (error) {
-            message.error('Delete failed');
+            message.error('Xóa thất bại');
         }
     };
 
@@ -80,7 +80,7 @@ const EmployeeList: React.FC = () => {
             render: (_, record) => (
                 <Space size="middle">
                     <Button icon={<EditOutlined />} onClick={() => navigate(`/employees/edit/${record.id}`)} />
-                    <Button icon={<FileWordOutlined />} onClick={() => handleExport(record.id)}>Export</Button>
+                    <Button icon={<FileWordOutlined />} onClick={() => handleExport(record.id)}>Xuất</Button>
                     <Button icon={<DeleteOutlined />} danger onClick={() => Modal.confirm({
                         title: 'Xóa nhân sự?',
                         onOk: () => handleDelete(record.id)
