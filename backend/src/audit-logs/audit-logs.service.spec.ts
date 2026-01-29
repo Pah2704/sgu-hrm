@@ -1,12 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditLogsService } from './audit-logs.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuditLog } from './audit-log.entity';
+import { AuditLog } from './entities/audit-log.entity';
 import { Repository } from 'typeorm';
 
 const mockLogRepository = {
     find: jest.fn().mockResolvedValue([]),
-    save: jest.fn(),
+    create: jest.fn().mockImplementation(dto => dto),
+    save: jest.fn().mockImplementation(dto => Promise.resolve({ id: '123', ...dto })),
 };
 
 describe('AuditLogsService', () => {

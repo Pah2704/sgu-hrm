@@ -73,7 +73,7 @@ export class UsersService implements OnApplicationBootstrap {
         }
 
         // Assign 'System Admin' role
-        // Check admin again in case it was created/updated (locally variable 'admin' holds it)
+        // Check admin again in case it was created/updated (local variable 'admin' holds it)
         if (admin) {
             const adminRole = await this.rolesService.findByName('System Admin');
             console.log(`[UsersService] Found System Admin role: ${adminRole ? 'Yes' : 'No'}`);

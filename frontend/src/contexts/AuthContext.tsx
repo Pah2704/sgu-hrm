@@ -24,6 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
             delete axios.defaults.headers.common['Authorization'];
             localStorage.removeItem('user'); // Clean up user if token is gone
+            setUser(null);
         }
     }, [token]);
 

@@ -14,9 +14,8 @@ const EmployeeList: React.FC = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // In production (Docker), nginx will proxy /api to backend:3000
-            // For now, in Docker internal network, frontend calls are from browser, so we need public URL.
-            // If running via docker-compose on localhost:
+            // In production (Docker), nginx proxies /api to backend:3000 (configured in Dockerfile)
+            // Use VITE_API_URL or default to localhost for dev
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
             const response = await axios.get(`${apiUrl}/employees`);
             setData(response.data);
