@@ -1,0 +1,17 @@
+FAIL src/employees/employees.service.spec.ts
+  ● Test suite failed to run
+
+    [96msrc/employees/employees.service.spec.ts[0m:[93m13[0m:[93m9[0m - [91merror[0m[90m TS7022: [0m'mockPrisma' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+
+    [7m13[0m   const mockPrisma = {
+    [7m  [0m [91m        ~~~~~~~~~~[0m
+    [96msrc/employees/employees.service.spec.ts[0m:[93m26[0m:[93m27[0m - [91merror[0m[90m TS7024: [0mFunction implicitly has return type 'any' because it does not have a return type annotation and is referenced directly or indirectly in one of its return expressions.
+
+    [7m26[0m     $transaction: jest.fn((callback) => callback(mockPrisma)),
+    [7m  [0m [91m                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+Test Suites: 1 failed, 1 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        3.468 s
+Ran all test suites matching /src\\employees\\employees.service.spec.ts/i.

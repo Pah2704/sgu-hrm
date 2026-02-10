@@ -1,0 +1,678 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AUTHENTICATION & AUTHORIZATION
+// ═══════════════════════════════════════════════════════════════════
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  
+  // Relations
+  employee      Employee?
+  roles         UserRole[]
+  posts         Post[]    @relation("PostAuthor")
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique  // SUPER_ADMIN, HR_ADMIN, CONTENT_ADMIN, MANAGER, EMPLOYEE
+  displayName String
+  description String?
+  isSystem    Boolean  @default(false) // System roles cannot be deleted
+  
+  // Relations
+  users       UserRole[]
+  permissions RolePermission[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique  // employees:read, employees:read_own, etc.
+  module      String             // employees, contracts, salary, cms, jobs, system
+  action      String             // read, write, delete, approve, etc.
+  scope       String?            // own, unit, null (all)
+  description String?
+  
+  // Relations
+  roles       RolePermission[]
+  
+  createdAt   DateTime @default(now())
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  unitId    String?  // Optional: scope role to a specific unit (for Manager role)
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  unit      Unit?    @relation(fields: [unitId], references: [id])
+  
+  createdAt DateTime @default(now())
+
+  @@unique([userId, roleId, unitId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime   @default(now())
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ORGANIZATION STRUCTURE
+// ═══════════════════════════════════════════════════════════════════
+
+model Unit {
+  id          String     @id @default(uuid())
+  code        String     @unique
+  name        String
+  shortName   String?
+  parentId    String?
+  unitType    UnitType
+  status      UnitStatus @default(ACTIVE)
+  path        String?    // Materialized path for tree queries (e.g., "root.khoa1.bomon1")
+  level       Int        @default(0)
+  sortOrder   Int        @default(0)
+  
+  // Relations
+  parent      Unit?      @relation("UnitTree", fields: [parentId], references: [id])
+  children    Unit[]     @relation("UnitTree")
+  employees   Employee[]
+  userRoles   UserRole[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("units")
+}
+
+enum UnitType {
+  TRUONG
+  KHOA
+  PHONG
+  BAN
+  TRUNG_TAM
+  TO_BO_MON
+}
+
+enum UnitStatus {
+  ACTIVE
+  INACTIVE
+  MERGED
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// EMPLOYEE (CORE HR)
+// ═══════════════════════════════════════════════════════════════════
+
+model Employee {
+  id                      String          @id @default(uuid())
+  userId                  String          @unique
+  employeeCode            String          @unique
+  citizenId               String          @unique
+  
+  // Basic Info (Mục 1-10 TT06)
+  avatarUrl               String?
+  fullName                String
+  aliasName               String?
+  dob                     DateTime
+  gender                  Gender
+  placeOfBirth            Json?           // { province, ward, detail }
+  hometown                Json?           // { province, ward, detail }
+  currentAddress          Json?           // { province, ward, detail }
+  ethnicityId             String?
+  religionId              String?
+  citizenCardDate         DateTime?
+  citizenCardPlace        String?
+  phone                   String?
+  socialInsuranceNo       String?
+  healthInsuranceNo       String?
+  
+  // Recruitment Info (Mục 11-18)
+  familyBackground        String?
+  jobBeforeRecruitment    String?
+  initialRecruitmentDate  DateTime?
+  initialRecruitmentAgency String?
+  currentOrgJoinDate      DateTime?
+  officialDate            DateTime?
+  email                   String?         @unique
+  partyJoinDate           DateTime?
+  partyOfficialDate       DateTime?
+  firstSocialOrgJoinDate  DateTime?
+  enlistmentDate          DateTime?
+  demobilizationDate      DateTime?
+  highestMilitaryRank     String?
+  policyCategory          String?
+  
+  // Education (Mục 19-22)
+  generalEducation        String?         // 12/12
+  highestDegree           String?         // Computed from Degrees
+  academicRank            AcademicRank?
+  academicRankYear        Int?
+  stateTitles             String?         // NGND, NGƯT
+  
+  // Position (Mục 23-29)
+  currentPosition         String?
+  appointDate             DateTime?
+  reAppointDate           DateTime?
+  planningTitles          String?
+  concurrentPositions     String?
+  partyPosition           String?
+  concurrentPartyPosition String?
+  mainDuty                String?
+  strongPoint             String?
+  longestJob              String?
+  
+  // Salary (Mục 30)
+  salaryType              SalaryType?
+  civilServantRankId      String?
+  salaryLevel             Int?
+  coefficient             Float?
+  levelDate               DateTime?
+  percentEnjoy            Int?            @default(100)
+  seniorityAllowance      Float?
+  jobPositionCode         String?
+  salaryAmount            Float?
+  positionAllowance       Float?
+  concurrentAllowance     Float?
+  otherAllowance          Float?
+  
+  // Health (Mục 31)
+  healthStatus            String?
+  height                  Float?
+  weight                  Float?
+  bloodType               BloodType?
+  
+  // Historical Features (Mục 34)
+  historicalFeatures      Json?
+  
+  // Economic Status (Mục 37)
+  assets                  Json?
+  
+  // System
+  status                  EmployeeStatus  @default(WORKING)
+  unitId                  String
+  
+  // Relations
+  user                    User            @relation(fields: [userId], references: [id])
+  unit                    Unit            @relation(fields: [unitId], references: [id])
+  ethnicity               Ethnicity?      @relation(fields: [ethnicityId], references: [id])
+  religion                Religion?       @relation(fields: [religionId], references: [id])
+  civilServantRank        CivilServantRank? @relation(fields: [civilServantRankId], references: [id])
+  relationships           EmployeeRelationship[]
+  contracts               Contract[]
+  degrees                 Degree[]
+  certificates            Certificate[]
+  positions               EmployeePosition[]
+  leaveRequests           LeaveRequest[]
+  salaryRecords           SalaryRecord[]
+  
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  @@map("employees")
+}
+
+enum Gender {
+  NAM
+  NU
+}
+
+enum EmployeeStatus {
+  WORKING
+  ON_LEAVE
+  LONG_LEAVE
+  RESIGNED
+  RETIRED
+}
+
+enum SalaryType {
+  NGACH_BAC
+  VI_TRI_VIEC_LAM
+}
+
+enum AcademicRank {
+  GS
+  PGS
+}
+
+enum BloodType {
+  A
+  B
+  AB
+  O
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// EMPLOYEE RELATIONSHIPS (Mục 36)
+// ═══════════════════════════════════════════════════════════════════
+
+model EmployeeRelationship {
+  id           String           @id @default(uuid())
+  employeeId   String
+  side         RelationshipSide @default(SELF)
+  relationship String           // Cha, Mẹ, Vợ/Chồng, Con
+  fullName     String
+  dob          DateTime?
+  occupation   String?
+  workplace    String?
+  address      String?
+  
+  employee     Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@map("employee_relationships")
+}
+
+enum RelationshipSide {
+  SELF
+  SPOUSE
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MASTER DATA
+// ═══════════════════════════════════════════════════════════════════
+
+model Ethnicity {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  employees Employee[]
+
+  @@map("ethnicities")
+}
+
+model Religion {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  employees Employee[]
+
+  @@map("religions")
+}
+
+model CivilServantRank {
+  id            String         @id @default(uuid())
+  code          String         @unique
+  name          String
+  rankType      String?        // Chuyên viên chính, Chuyên viên, etc.
+  rankGroup     RankGroup
+  minCoefficient Float?
+  maxCoefficient Float?
+  
+  employees     Employee[]
+  salaryRecords SalaryRecord[]
+
+  @@map("civil_servant_ranks")
+}
+
+enum RankGroup {
+  A0
+  A1
+  A2
+  A3
+  B
+  C
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CONTRACTS (Phân hệ 4)
+// ═══════════════════════════════════════════════════════════════════
+
+model Contract {
+  id              String          @id @default(uuid())
+  employeeId      String
+  contractNumber  String
+  contractType    ContractType
+  startDate       DateTime
+  endDate         DateTime?
+  signedDate      DateTime?
+  originalFileUrl String?
+  signedFileUrl   String?
+  status          ContractStatus  @default(DRAFT)
+  alertSent       Json?           // { day30: boolean, day60: boolean, day90: boolean }
+  notes           String?
+  
+  employee        Employee        @relation(fields: [employeeId], references: [id])
+  appendices      ContractAppendix[]
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@map("contracts")
+}
+
+model ContractAppendix {
+  id             String   @id @default(uuid())
+  contractId     String
+  appendixNumber String
+  content        Json?    // Flexible content changes
+  effectiveDate  DateTime
+  signedFileUrl  String?
+  
+  contract       Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  createdAt      DateTime @default(now())
+
+  @@map("contract_appendices")
+}
+
+enum ContractType {
+  HDLD_XAC_DINH
+  HDLD_KHONG_XAC_DINH
+  HDLV
+  THU_VIEC
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// EDUCATION (Phân hệ 6)
+// ═══════════════════════════════════════════════════════════════════
+
+model Degree {
+  id             String         @id @default(uuid())
+  employeeId     String
+  degreeType     DegreeType
+  major          String
+  institution    String
+  graduationYear Int
+  degreeNumber   String?
+  fileUrl        String?
+  status         ApprovalStatus @default(PENDING)
+  approvedBy     String?
+  approvedAt     DateTime?
+  
+  employee       Employee       @relation(fields: [employeeId], references: [id])
+  
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("degrees")
+}
+
+model Certificate {
+  id             String         @id @default(uuid())
+  employeeId     String
+  name           String
+  issuedBy       String
+  issuedDate     DateTime?
+  expiryDate     DateTime?
+  fileUrl        String?
+  status         ApprovalStatus @default(PENDING)
+  
+  employee       Employee       @relation(fields: [employeeId], references: [id])
+  
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("certificates")
+}
+
+enum DegreeType {
+  TRUNG_CAP
+  CAO_DANG
+  DAI_HOC
+  THAC_SI
+  TIEN_SI
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// POSITIONS (Phân hệ 7)
+// ═══════════════════════════════════════════════════════════════════
+
+model Position {
+  id               String             @id @default(uuid())
+  code             String             @unique
+  name             String
+  positionType     PositionType
+  level            Int                @default(0)
+  
+  employeePositions EmployeePosition[]
+  
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@map("positions")
+}
+
+model EmployeePosition {
+  id           String       @id @default(uuid())
+  employeeId   String
+  positionId   String
+  isPrimary    Boolean      @default(false)
+  appointDate  DateTime
+  endDate      DateTime?
+  decisionNo   String?
+  decisionDate DateTime?
+  documentUrl  String?
+  
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+  position     Position     @relation(fields: [positionId], references: [id])
+  
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@map("employee_positions")
+}
+
+enum PositionType {
+  CHINH
+  KIEM_NHIEM
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LEAVES (Phân hệ 9)
+// ═══════════════════════════════════════════════════════════════════
+
+model LeaveType {
+  id            String         @id @default(uuid())
+  code          String         @unique
+  name          String
+  category      LeaveCategory
+  maxDays       Int?
+  isPaid        Boolean        @default(true)
+  
+  leaveRequests LeaveRequest[]
+  
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("leave_types")
+}
+
+model LeaveRequest {
+  id           String         @id @default(uuid())
+  employeeId   String
+  leaveTypeId  String
+  startDate    DateTime
+  endDate      DateTime
+  totalDays    Float
+  reason       String?
+  status       ApprovalStatus @default(PENDING)
+  approvedBy   String?
+  approvedAt   DateTime?
+  hrConfirmedBy String?
+  hrConfirmedAt DateTime?
+  notes        String?
+  
+  employee     Employee       @relation(fields: [employeeId], references: [id])
+  leaveType    LeaveType      @relation(fields: [leaveTypeId], references: [id])
+  
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@map("leave_requests")
+}
+
+enum LeaveCategory {
+  PAID_SCHOOL
+  PAID_BHXH
+  UNPAID
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SALARY (Phân hệ 10)
+// ═══════════════════════════════════════════════════════════════════
+
+model SalaryRecord {
+  id                  String           @id @default(uuid())
+  employeeId          String
+  civilServantRankId  String?
+  salaryLevel         Int
+  coefficient         Float
+  currentLevelDate    DateTime
+  expectedRaiseDate   DateTime         // Critical field
+  percentEnjoy        Int              @default(100)
+  seniorityAllowance  Float?
+  positionAllowance   Float?
+  concurrentAllowance Float?
+  otherAllowance      Float?
+  warningFlag         Boolean          @default(false)
+  warningReason       String?
+  effectiveFrom       DateTime
+  effectiveTo         DateTime?
+  
+  employee            Employee         @relation(fields: [employeeId], references: [id])
+  civilServantRank    CivilServantRank? @relation(fields: [civilServantRankId], references: [id])
+  
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@map("salary_records")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CMS (Phân hệ 14)
+// ═══════════════════════════════════════════════════════════════════
+
+model Category {
+  id          String     @id @default(uuid())
+  code        String     @unique
+  name        String
+  type        CategoryType
+  parentId    String?
+  sortOrder   Int        @default(0)
+  
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  posts       PostCategory[]
+  documents   Document[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("categories")
+}
+
+model Post {
+  id          String         @id @default(uuid())
+  title       String
+  slug        String         @unique
+  excerpt     String?
+  content     String         // HTML content from CKEditor
+  thumbnail   String?
+  authorId    String
+  status      PostStatus     @default(DRAFT)
+  publishedAt DateTime?
+  viewCount   Int            @default(0)
+  isFeatured  Boolean        @default(false)
+  
+  author      User           @relation("PostAuthor", fields: [authorId], references: [id])
+  categories  PostCategory[]
+  
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("posts")
+}
+
+model PostCategory {
+  id         String   @id @default(uuid())
+  postId     String
+  categoryId String
+  
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, categoryId])
+  @@map("post_categories")
+}
+
+model Document {
+  id          String       @id @default(uuid())
+  title       String
+  description String?
+  categoryId  String
+  fileUrl     String
+  fileType    String?      // pdf, docx, xlsx
+  fileSize    Int?
+  isPublic    Boolean      @default(true)
+  
+  category    Category     @relation(fields: [categoryId], references: [id])
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("documents")
+}
+
+enum CategoryType {
+  NEWS
+  DOCUMENT
+  RECRUITMENT
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
